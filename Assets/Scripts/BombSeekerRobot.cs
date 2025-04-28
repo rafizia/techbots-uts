@@ -13,8 +13,11 @@ public class BombSeekerRobot : MonoBehaviour
     private int pathIndex = 0;
     private bool foundBomb = false;
 
+    private RobotController robotController;
+
     void Start()
     {
+        robotController = GetComponent<RobotController>();
         GoToNextTarget();
     }
 
@@ -23,7 +26,9 @@ public class BombSeekerRobot : MonoBehaviour
         if (foundBomb || currentPath == null || pathIndex >= currentPath.Count) return;
 
         Transform target = currentPath[pathIndex].transform;
-        transform.position = Vector3.MoveTowards(transform.position, target.position, speed * Time.deltaTime);
+        // transform.position = Vector3.MoveTowards(transform.position, target.position, speed * Time.deltaTime);
+        robotController.Waypoint = target;
+        robotController.Navigate();
 
         if (Vector3.Distance(transform.position, target.position) < 0.1f)
         {

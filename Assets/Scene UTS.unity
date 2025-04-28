@@ -15286,7 +15286,7 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1283037223, guid: 78f66e17931a4e5449da398ea3d1f94c,
         type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1033340553}
+      addedObject: {fileID: 1033340554}
     - targetCorrespondingSourceObject: {fileID: 2126553635, guid: 78f66e17931a4e5449da398ea3d1f94c,
         type: 3}
       insertIndex: -1
@@ -15386,7 +15386,7 @@ MonoBehaviour:
   - {fileID: 637113351}
   pathfinder: {fileID: 353326744}
   speed: 2
---- !u!114 &1033340553
+--- !u!114 &1033340554
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -15395,17 +15395,21 @@ MonoBehaviour:
   m_GameObject: {fileID: 760103908}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 149a8579d5ca84e4d9797d9e6c511355, type: 3}
+  m_Script: {fileID: 11500000, guid: fc599d93b47142b4eb6c5bf51b7a622e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  rayCount: 100
-  maxDistance: 3
-  drawDuration: 0.05
-  rayColor: {r: 0, g: 1, b: 0, a: 1}
-  hitColor: {r: 1, g: 0, b: 0, a: 1}
+  lidarMaxDistance: 2
+  minObstacleDistance: 2
+  lidarRayCount: 50
+  lidarAngle: 360
   obstacleLayer:
     serializedVersion: 2
     m_Bits: 4294967295
+  steeringAmount: 40
+  heightDetectionOffset: 0.5
+  Waypoint: {fileID: 1242313254}
+  arrivalThreshold: 1
+  sideMinObstacleDistance: 0.5
 --- !u!1 &1047154195
 GameObject:
   m_ObjectHideFlags: 0
