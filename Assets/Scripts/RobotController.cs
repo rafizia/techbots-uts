@@ -28,7 +28,7 @@ public class RobotController : MonoBehaviour
 
     private bool isReversing = false; // Flag untuk mendeteksi apakah sedang mundur
     private float reverseTimer = 0f; // Timer untuk mundur
-    private float reverseDuration = 4f; // Durasi mundur dalam detik
+    private float reverseDuration = 3f; // Durasi mundur dalam detik
 
     private Vector3 lastValidPosition; // Posisi terakhir yang valid
     private Quaternion lastValidRotation; // Rotasi terakhir yang valid
@@ -37,6 +37,8 @@ public class RobotController : MonoBehaviour
     [SerializeField] private float arrivalThreshold = 1f; // seberapa dekat ke target dianggap sampai
 
     private bool isMovingToTarget = false;
+    [SerializeField] private List<Transform> waypoints;
+    private int currentWaypointIndex = 0;
 
 
     private void Start()
@@ -185,6 +187,7 @@ public class RobotController : MonoBehaviour
             }
             else
             {
+                movement.TurnLeft(0);
                 movement.MoveBackward();
             }
             return;
@@ -257,33 +260,39 @@ public class RobotController : MonoBehaviour
         }
         else
         {
-            Vector3 directionToTarget = (targetWaypoint.position - transform.position);
-            directionToTarget.y = 0;
-
-            float distance = directionToTarget.magnitude;
-            Vector3 dirNormalized = directionToTarget.normalized;
-
-            float angle = Vector3.SignedAngle(transform.forward, dirNormalized, Vector3.up);
-
-            if (Mathf.Abs(angle) > 5f)
+            if (waypoints.Count > 0 && currentWaypointIndex < waypoints.Count)
             {
-                if (angle > 0)
-                    movement.TurnRight(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount));
+                targetWaypoint = waypoints[currentWaypointIndex];
+
+                // Hitung arah dan jarak ke waypoint
+                Vector3 directionToTarget = (targetWaypoint.position - transform.position);
+                directionToTarget.y = 0;
+
+                float distance = directionToTarget.magnitude;
+                Vector3 dirNormalized = directionToTarget.normalized;
+
+                float angle = Vector3.SignedAngle(transform.forward, dirNormalized, Vector3.up);
+
+                if (Mathf.Abs(angle) > 5f)
+                {
+                    if (angle > 0)
+                        movement.TurnRight(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount));
+                    else
+                        movement.TurnLeft(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount));
+                }
                 else
-                    movement.TurnLeft(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount));
-            }
-            else
-            {
-                movement.TurnLeft(0);
-            }
+                {
+                    movement.TurnLeft(0);
+                }
 
-            movement.MoveForward();
+                movement.MoveForward();
 
-            if (distance < arrivalThreshold)
-            {
-                isMovingToTarget = false;
-                movement.StopMovement();
-                Debug.Log("Robot has reached the target!");
+                // Jika sudah dekat dengan waypoint, pindah ke waypoint berikutnya
+                if (distance < 2)
+                {
+                    UnityEngine.Debug.Log($"Reached waypoint {currentWaypointIndex + 1}");
+                    currentWaypointIndex++; // Pindah ke waypoint berikutnya
+                }
             }
         }
 

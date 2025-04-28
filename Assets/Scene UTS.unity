@@ -15157,7 +15157,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 760103908}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 149a8579d5ca84e4d9797d9e6c511355, type: 3}
   m_Name: 
@@ -15191,9 +15191,17 @@ MonoBehaviour:
     m_Bits: 4294967295
   steeringAmount: 40
   heightDetectionOffset: 0.5
-  targetWaypoint: {fileID: 1242313254}
+  Waypoint: {fileID: 350046764}
   arrivalThreshold: 1
-  rotationSpeed: 60
+  waypoints:
+  - {fileID: 350046764}
+  - {fileID: 1662310227}
+  - {fileID: 763001566}
+  - {fileID: 1096454520}
+  - {fileID: 914836125}
+  - {fileID: 1407671058}
+  - {fileID: 932928352}
+  - {fileID: 571840560}
 --- !u!1 &1047154195
 GameObject:
   m_ObjectHideFlags: 0
