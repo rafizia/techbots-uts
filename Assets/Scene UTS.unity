@@ -4617,12 +4617,6 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 369688595}
   m_PrefabAsset: {fileID: 0}
---- !u!4 &371906952 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 1604873719, guid: 78f66e17931a4e5449da398ea3d1f94c,
-    type: 3}
-  m_PrefabInstance: {fileID: 1033340541}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &373949461
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -14451,12 +14445,6 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 942061056}
   m_PrefabAsset: {fileID: 0}
---- !u!4 &943765271 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 1171793884, guid: 78f66e17931a4e5449da398ea3d1f94c,
-    type: 3}
-  m_PrefabInstance: {fileID: 1033340541}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &945208917
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -14540,12 +14528,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4000013978381734, guid: fe9a19d4f0d796c40bf4fc6b69dd7b81,
     type: 3}
   m_PrefabInstance: {fileID: 945208917}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &954506962 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 290995903, guid: 78f66e17931a4e5449da398ea3d1f94c,
-    type: 3}
-  m_PrefabInstance: {fileID: 1033340541}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &961332317
 PrefabInstance:
@@ -15301,6 +15283,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 1033340552}
+    - targetCorrespondingSourceObject: {fileID: 1283037223, guid: 78f66e17931a4e5449da398ea3d1f94c,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1033340553}
     - targetCorrespondingSourceObject: {fileID: 2126553635, guid: 78f66e17931a4e5449da398ea3d1f94c,
         type: 3}
       insertIndex: -1
@@ -15351,16 +15337,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 864c4739c84a02446b646f0f2bbb7679, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  motorForce: 100
+  motorForce: 75
   breakForce: 200
-  maxSteerAngle: 30
-  rotationSpeed: 100
-  leftWheels:
-  - {fileID: 943765271}
-  - {fileID: 371906952}
-  rightWheels:
-  - {fileID: 1228040416}
-  - {fileID: 954506962}
+  maxSteerAngle: 35
 --- !u!54 &1033340550
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -15407,6 +15386,26 @@ MonoBehaviour:
   - {fileID: 637113351}
   pathfinder: {fileID: 353326744}
   speed: 2
+--- !u!114 &1033340553
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 760103908}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 149a8579d5ca84e4d9797d9e6c511355, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rayCount: 100
+  maxDistance: 3
+  drawDuration: 0.05
+  rayColor: {r: 0, g: 1, b: 0, a: 1}
+  hitColor: {r: 1, g: 0, b: 0, a: 1}
+  obstacleLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &1047154195
 GameObject:
   m_ObjectHideFlags: 0
@@ -18580,12 +18579,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 95c00f442e3cf3643b2062e8e0d0bbd6, type: 3}
---- !u!4 &1228040416 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 356009328, guid: 78f66e17931a4e5449da398ea3d1f94c,
-    type: 3}
-  m_PrefabInstance: {fileID: 1033340541}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1234393278
 PrefabInstance:
   m_ObjectHideFlags: 0

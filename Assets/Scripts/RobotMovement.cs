@@ -4,7 +4,6 @@ using UnityEngine;
 
 public class RobotMovement : MonoBehaviour
 {
-    // Kontrol (Manual): WASD, Rem: Spacebar, Tombol Panah Kanan Kiri untuk Rotasi
     private float horizontalInput, verticalInput;
     private float currentSteerAngle, currentbreakForce;
     private bool isBreaking;
@@ -15,13 +14,7 @@ public class RobotMovement : MonoBehaviour
     private Transform frontLeftWheelTransform, frontRightWheelTransform;
     private Transform rearLeftWheelTransform, rearRightWheelTransform;
 
-    // Rotation
-    private bool isRotating = false;
-    private float rotationAngle = 90f;
-
-    [SerializeField] private float rotationSpeed = 10f;
-    [SerializeField] private List<Transform> leftWheels;
-    [SerializeField] private List<Transform> rightWheels;
+    private bool isAutonomousMode = false;
 
     private void Start()
     {
@@ -38,38 +31,30 @@ public class RobotMovement : MonoBehaviour
 
     private void Update()
     {
-        // Rotasi
-        if (Input.GetKeyDown(KeyCode.RightArrow) && !isRotating)
+        if (!isAutonomousMode)
         {
-            StartCoroutine(Rotate(Vector3.up * 30f, -1)); // 30f --> sudut rotasi
-        }
-        if (Input.GetKeyDown(KeyCode.LeftArrow) && !isRotating)
-        {
-            StartCoroutine(Rotate(Vector3.down * 30f, 1));
+            GetInput();
         }
     }
 
     private void FixedUpdate()
     {
-        GetInput();
-        HandleMotor();
-        HandleSteering();
-        UpdateWheels();
+        if (!isAutonomousMode)
+        {
+            HandleMotor();
+            HandleSteering();
+            UpdateWheels();
+        }
     }
 
-    private void GetInput() // Manual Control
+    private void GetInput()
     {
-        // Belok
         horizontalInput = Input.GetAxis("Horizontal");
-
-        // Maju dan Mundur
         verticalInput = Input.GetAxis("Vertical");
-
-        // Rem
         isBreaking = Input.GetKey(KeyCode.Space);
     }
 
-    private void HandleMotor() // Method untuk maju mundur
+    private void HandleMotor()
     {
         frontLeftWheelCollider.motorTorque = verticalInput * motorForce;
         frontRightWheelCollider.motorTorque = verticalInput * motorForce;
@@ -77,41 +62,11 @@ public class RobotMovement : MonoBehaviour
         ApplyBreaking();
     }
 
-    private void HandleSteering() // Method untuk belok
+    private void HandleSteering()
     {
         currentSteerAngle = maxSteerAngle * horizontalInput;
         frontLeftWheelCollider.steerAngle = currentSteerAngle;
         frontRightWheelCollider.steerAngle = currentSteerAngle;
-    }
-
-    private IEnumerator Rotate(Vector3 byAngle, int direction) // Method untuk rotasi
-    {
-        isRotating = true;
-
-        Quaternion from = transform.rotation;
-        Quaternion to = Quaternion.Euler(transform.eulerAngles + byAngle);
-        float duration = Mathf.Abs(rotationAngle / rotationSpeed);
-        float elapsed = 0f;
-
-        while (elapsed < duration)
-        {
-            transform.rotation = Quaternion.Slerp(from, to, elapsed / duration);
-
-            foreach (Transform wheel in leftWheels)
-            {
-                wheel.Rotate(Vector3.right * 360 * Time.deltaTime * direction, Space.Self);
-            }
-            foreach (Transform wheel in rightWheels)
-            {
-                wheel.Rotate(Vector3.right * -360 * Time.deltaTime * direction, Space.Self);
-            }
-
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        transform.rotation = to;
-        isRotating = false;
     }
 
     private void ApplyBreaking()
@@ -137,5 +92,41 @@ public class RobotMovement : MonoBehaviour
         wheelCollider.GetWorldPose(out pos, out rot);
         wheelTransform.rotation = rot;
         wheelTransform.position = pos;
+    }
+
+    // ---- FUNCTION UNTUK AUTONOMOUS ----
+    public void MoveForward()
+    {
+        frontLeftWheelCollider.motorTorque = motorForce;
+        frontRightWheelCollider.motorTorque = motorForce;
+    }
+
+    public void MoveBackward()
+    {
+        frontLeftWheelCollider.motorTorque = -motorForce;
+        frontRightWheelCollider.motorTorque = -motorForce;
+    }
+
+    public void TurnLeft(float amount)
+    {
+        frontLeftWheelCollider.steerAngle = -amount;
+        frontRightWheelCollider.steerAngle = -amount;
+    }
+
+    public void TurnRight(float amount)
+    {
+        frontLeftWheelCollider.steerAngle = amount;
+        frontRightWheelCollider.steerAngle = amount;
+    }
+
+    public void StopMovement()
+    {
+        frontLeftWheelCollider.motorTorque = 0f;
+        frontRightWheelCollider.motorTorque = 0f;
+    }
+
+    public void SetAutonomousMode(bool isAuto)
+    {
+        isAutonomousMode = isAuto;
     }
 }
