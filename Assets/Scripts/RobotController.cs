@@ -22,6 +22,7 @@ public class RobotController : MonoBehaviour
 
     private RaycastHit[] lidarHits;
     private Vector3[] lidarDirections;
+    private bool[] unsafeDirections; // Array untuk menandai arah yang tidak aman untuk dibelok
     private bool isTurning = false;
     private float turnTimer = 0f;
     private float turnDuration = 0.5f;
@@ -69,6 +70,7 @@ public class RobotController : MonoBehaviour
     {
         lidarDirections = new Vector3[lidarRayCount];
         lidarHits = new RaycastHit[lidarRayCount];
+        unsafeDirections = new bool[lidarRayCount]; // Inisialisasi array untuk menandai arah yang tidak aman
 
         // Calculate directions for each ray
         float startAngle = -lidarAngle / 2;
@@ -78,6 +80,7 @@ public class RobotController : MonoBehaviour
         {
             float currentAngle = startAngle + (angleStep * i);
             lidarDirections[i] = Quaternion.Euler(0, currentAngle, 0) * Vector3.forward;
+            unsafeDirections[i] = false; // Awalnya semua arah aman
         }
     }
 
@@ -161,7 +164,10 @@ public class RobotController : MonoBehaviour
             {
                 lidarHits[i] = hit;
 
-                Color rayColor = (hit.distance <= currentMinObstacleDistance) ? Color.red : Color.green;
+                // Tandai arah yang tidak aman jika jarak terlalu dekat dengan obstacle
+                unsafeDirections[i] = hit.distance <= currentMinObstacleDistance;
+                
+                Color rayColor = unsafeDirections[i] ? Color.red : Color.green;
                 UnityEngine.Debug.DrawRay(rayStart, rayDirection * hit.distance, rayColor);
             }
             else
@@ -169,6 +175,7 @@ public class RobotController : MonoBehaviour
                 RaycastHit emptyHit = new RaycastHit();
                 emptyHit.distance = lidarMaxDistance + 1;
                 lidarHits[i] = emptyHit;
+                unsafeDirections[i] = false; // Arah aman
                 UnityEngine.Debug.DrawRay(rayStart, rayDirection * lidarMaxDistance, Color.green);
             }
         }
@@ -244,7 +251,12 @@ public class RobotController : MonoBehaviour
 
             movement.StopMovement();
 
-            if (leftDistance < minObstacleDistance && rightDistance < minObstacleDistance)
+            // Periksa apakah terdapat hambatan di kiri atau kanan berdasarkan flag unsafeDirections
+            bool leftUnsafe = IsDirectionUnsafe(0, centerRayIndex - 2);
+            bool rightUnsafe = IsDirectionUnsafe(centerRayIndex + 2, lidarRayCount - 1);
+
+            if ((leftDistance < minObstacleDistance && rightDistance < minObstacleDistance) || 
+                (leftUnsafe && rightUnsafe))
             {
                 UnityEngine.Debug.Log("No space to turn, reversing...");
                 isReversing = true;
@@ -255,7 +267,18 @@ public class RobotController : MonoBehaviour
             isTurning = true;
             turnTimer = 0f;
 
-            if (leftDistance > rightDistance)
+            // Prioritaskan belok ke arah yang aman
+            if (leftUnsafe && !rightUnsafe)
+            {
+                UnityEngine.Debug.Log("Left is unsafe, turning RIGHT");
+                movement.TurnRight(steeringAmount);
+            }
+            else if (!leftUnsafe && rightUnsafe)
+            {
+                UnityEngine.Debug.Log("Right is unsafe, turning LEFT");
+                movement.TurnLeft(steeringAmount);
+            }
+            else if (leftDistance > rightDistance)
             {
                 UnityEngine.Debug.Log("Turning LEFT");
                 movement.TurnLeft(steeringAmount);
@@ -280,10 +303,17 @@ public class RobotController : MonoBehaviour
 
             if (Mathf.Abs(angle) > 5f)
             {
-                if (angle > 0)
+                // Cek apakah arah yang ingin dibelok aman
+                if (angle > 0 && !IsRightDirectionUnsafe())
                     movement.TurnRight(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount));
-                else
+                else if (angle < 0 && !IsLeftDirectionUnsafe())
                     movement.TurnLeft(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount));
+                else if (angle > 0 && IsRightDirectionUnsafe() && !IsLeftDirectionUnsafe())
+                    movement.TurnLeft(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount)); // Belok kiri jika kanan tidak aman
+                else if (angle < 0 && IsLeftDirectionUnsafe() && !IsRightDirectionUnsafe())
+                    movement.TurnRight(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount)); // Belok kanan jika kiri tidak aman
+                else
+                    movement.TurnLeft(0); // Tidak belok jika kedua arah tidak aman
             }
             else
             {
@@ -360,5 +390,33 @@ public class RobotController : MonoBehaviour
     {
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, minObstacleDistance);
+    }
+
+    // Fungsi untuk memeriksa apakah suatu rentang arah tidak aman
+    private bool IsDirectionUnsafe(int startIdx, int endIdx)
+    {
+        if (startIdx < 0) startIdx = 0;
+        if (endIdx >= lidarRayCount) endIdx = lidarRayCount - 1;
+
+        for (int i = startIdx; i <= endIdx; i++)
+        {
+            if (unsafeDirections[i])
+                return true;
+        }
+        return false;
+    }
+
+    // Fungsi untuk memeriksa apakah arah kiri tidak aman
+    private bool IsLeftDirectionUnsafe()
+    {
+        int centerRayIndex = lidarRayCount / 2;
+        return IsDirectionUnsafe(0, centerRayIndex - 2);
+    }
+
+    // Fungsi untuk memeriksa apakah arah kanan tidak aman
+    private bool IsRightDirectionUnsafe()
+    {
+        int centerRayIndex = lidarRayCount / 2;
+        return IsDirectionUnsafe(centerRayIndex + 2, lidarRayCount - 1);
     }
 }
