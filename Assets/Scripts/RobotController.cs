@@ -28,7 +28,7 @@ public class RobotController : MonoBehaviour
 
     private bool isReversing = false; // Flag untuk mendeteksi apakah sedang mundur
     private float reverseTimer = 0f; // Timer untuk mundur
-    private float reverseDuration = 3f; // Durasi mundur dalam detik
+    private float reverseDuration = 4f; // Durasi mundur dalam detik
 
     private Vector3 lastValidPosition; // Posisi terakhir yang valid
     private Quaternion lastValidRotation; // Rotasi terakhir yang valid
@@ -38,26 +38,6 @@ public class RobotController : MonoBehaviour
 
     private bool isMovingToTarget = false;
 
-    [SerializeField] private float sideMinObstacleDistance = 0.5f; // Jarak minimal aman samping
-    
-    // Variabel untuk mendeteksi dan menangani situasi stuck
-    private bool isStuck = false;
-    private float stuckTimer = 0f;
-    private float stuckTimeThreshold = 1.0f; // Lebih cepat mendeteksi stuck
-    private float stuckRotationAmount = 120f; // Sudut rotasi lebih besar untuk keluar dari situasi stuck
-    private bool isStuckTurning = false;
-    private float stuckTurnTimer = 0f;
-    private float stuckTurnDuration = 1.5f;
-
-    // Obstacle memory untuk menghindari area yang pernah menyebabkan stuck
-    private List<Vector3> problemAreas = new List<Vector3>();
-    private float problemAreaRadius = 2.0f; // Radius area yang dihindari
-    private float minDistanceToProblemArea = 2.5f; // Jarak minimal ke area masalah
-
-    // Force stop flag - untuk mencegah robot bergerak sama sekali jika tabrakan tak terelakkan
-    private bool forceStop = false;
-    private float forceStopTimer = 0f;
-    private float forceStopDuration = 2.0f;
 
     private void Start()
     {
@@ -75,15 +55,12 @@ public class RobotController : MonoBehaviour
         // Set robot to autonomous mode
         movement.SetAutonomousMode(isAutonomousMode);
 
-        // Stop movement initially and wait for navigation decisions
-        movement.StopMovement();
+        // Move forward initially
+        movement.MoveForward();
 
         // Simpan posisi dan rotasi awal sebagai posisi valid
         lastValidPosition = transform.position;
         lastValidRotation = transform.rotation;
-        
-        // Inisialisasi list problem areas
-        problemAreas = new List<Vector3>();
     }
 
     private void InitializeLidar()
@@ -115,29 +92,7 @@ public class RobotController : MonoBehaviour
             }
         }
 
-        // Untuk deteksi stuck turning
-        if (isStuckTurning)
-        {
-            stuckTurnTimer += Time.deltaTime;
-            if (stuckTurnTimer >= stuckTurnDuration)
-            {
-                isStuckTurning = false;
-                stuckTurnTimer = 0f;
-            }
-        }
-
-        // Force stop timer
-        if (forceStop)
-        {
-            forceStopTimer += Time.deltaTime;
-            if (forceStopTimer >= forceStopDuration)
-            {
-                forceStop = false;
-                forceStopTimer = 0f;
-            }
-        }
-
-        if (isAutonomousMode && !forceStop)
+        if (isAutonomousMode)
         {
             // Scan surroundings with LIDAR
             ScanWithLidar();
@@ -150,12 +105,7 @@ public class RobotController : MonoBehaviour
             // Simpan posisi dan rotasi terakhir yang valid
             lastValidPosition = transform.position;
             lastValidRotation = transform.rotation;
-        }
-        else if (forceStop)
-        {
-            // Force robot to completely stop if force stop is active
-            movement.StopMovement();
-        }
+        }  
     }
 
     private void UpdateVisuals()
@@ -209,12 +159,13 @@ public class RobotController : MonoBehaviour
             {
                 lidarHits[i] = hit;
 
-                UnityEngine.Debug.DrawRay(rayStart, rayDirection * hit.distance, Color.red);
+                Color rayColor = (hit.distance <= currentMinObstacleDistance) ? Color.red : Color.green;
+                UnityEngine.Debug.DrawRay(rayStart, rayDirection * hit.distance, rayColor);
             }
             else
             {
                 RaycastHit emptyHit = new RaycastHit();
-                emptyHit.distance = float.PositiveInfinity;
+                emptyHit.distance = lidarMaxDistance + 1;
                 lidarHits[i] = emptyHit;
                 UnityEngine.Debug.DrawRay(rayStart, rayDirection * lidarMaxDistance, Color.green);
             }
@@ -223,13 +174,6 @@ public class RobotController : MonoBehaviour
 
     private void Navigate(Transform targetWaypoint)
     {
-        // Jika kita dipaksa berhenti, jangan navigasi sama sekali
-        if (forceStop)
-        {
-            movement.StopMovement();
-            return;
-        }
-
         if (isReversing)
         {
             reverseTimer += Time.deltaTime;
@@ -237,206 +181,37 @@ public class RobotController : MonoBehaviour
             {
                 isReversing = false;
                 reverseTimer = 0f;
-                
-                // Setelah mundur, coba belok untuk keluar dari situasi
-                if (isStuck)
-                {
-                    // Catat lokasi ini sebagai area bermasalah
-                    Vector3 problemLocation = transform.position;
-                    if (!IsNearExistingProblemArea(problemLocation))
-                    {
-                        problemAreas.Add(problemLocation);
-                        UnityEngine.Debug.Log($"Added problem area at {problemLocation}. Total: {problemAreas.Count}");
-                    }
-                
-                    UnityEngine.Debug.Log("After reversing, attempting to rotate to escape stuck situation");
-                    isStuckTurning = true;
-                    stuckTurnTimer = 0f;
-
-                    // Belok ke arah yang umumnya lebih luas
-                    float leftDistance = CalculateAverageDistance(0, lidarRayCount / 2 - 1);
-                    float rightDistance = CalculateAverageDistance(lidarRayCount / 2 + 1, lidarRayCount - 1);
-                    
-                    if (leftDistance > rightDistance)
-                    {
-                        movement.TurnLeft(stuckRotationAmount);
-                    }
-                    else
-                    {
-                        movement.TurnRight(stuckRotationAmount);
-                    }
-
-                    // Reset stuck status setelah mencoba keluar
-                    isStuck = false;
-                    stuckTimer = 0f;
-                }
-                else
-                {
-                    movement.StopMovement();
-                }
+                movement.StopMovement();
             }
             else
             {
-                movement.TurnLeft(0);
                 movement.MoveBackward();
             }
             return;
         }
 
-        if (isTurning || isStuckTurning)
+        if (isTurning)
         {
             return;
+        }
+
+        foreach (var hit in lidarHits)
+        {
+            if (hit.distance > 0 && hit.distance < 0.5f)
+            {
+                UnityEngine.Debug.Log("Too close to obstacle, reversing...");
+                isReversing = true;
+                reverseTimer = 0f;
+                return;
+            }
         }
 
         int centerRayIndex = lidarRayCount / 2;
+
+        bool obstacleAhead = false;
         int middleRayStart = centerRayIndex - 1;
         int middleRayEnd = centerRayIndex + 1;
 
-        // Cek jika ada zona masalah di sekitar yang harus dihindari
-        bool nearProblemArea = IsNearAnyProblemArea(transform.position);
-        if (nearProblemArea)
-        {
-            // Jika dekat dengan area bermasalah, cari jalan alternatif
-            UnityEngine.Debug.Log("Near a known problem area! Finding alternative path...");
-            
-            // Cari arah yang paling jauh dari area masalah terdekat
-            Vector3 avoidDirection = GetAvoidDirectionFromNearestProblemArea();
-            
-            // Belok ke arah yang berlawanan dengan area masalah
-            float angle = Vector3.SignedAngle(transform.forward, avoidDirection, Vector3.up);
-            
-            if (angle > 0)
-            {
-                movement.TurnRight(Mathf.Min(Mathf.Abs(angle), steeringAmount * 1.5f));
-            }
-            else
-            {
-                movement.TurnLeft(Mathf.Min(Mathf.Abs(angle), steeringAmount * 1.5f));
-            }
-            
-            // Bergerak perlahan saat menghindari area masalah
-            movement.MoveForward();
-            return;
-        }
-
-        // DETEKSI TABRAKAN IMMINENT - Objek sangat dekat dari arah manapun
-        bool aboutToCrash = false;
-        foreach (var hit in lidarHits)
-        {
-            if (hit.distance > 0 && hit.distance < 0.3f) // Threshold lebih kecil untuk deteksi tabrakan imminent
-            {
-                aboutToCrash = true;
-                break;
-            }
-        }
-
-        if (aboutToCrash)
-        {
-            // PAKSA BERHENTI TOTAL JIKA HAMPIR NABRAK
-            UnityEngine.Debug.LogWarning("IMMINENT COLLISION DETECTED! Force stopping all movement!");
-            forceStop = true;
-            forceStopTimer = 0f;
-            movement.StopMovement();
-            return;
-        }
-
-        // Deteksi obstacle di sisi kiri dan kanan
-        bool obstacleLeft = false;
-        bool obstacleRight = false;
-        int sideRayCount = Mathf.Max(2, lidarRayCount / 3); // Lebih banyak ray untuk samping
-        
-        // Cek sisi kiri (ray paling kiri)
-        for (int i = 0; i < sideRayCount; i++) {
-            if (i < lidarHits.Length && lidarHits[i].distance < sideMinObstacleDistance) {
-                obstacleLeft = true;
-                break;
-            }
-        }
-        // Cek sisi kanan (ray paling kanan)
-        for (int i = lidarRayCount - sideRayCount; i < lidarRayCount; i++) {
-            if (i < lidarHits.Length && lidarHits[i].distance < sideMinObstacleDistance) {
-                obstacleRight = true;
-                break;
-            }
-        }
-
-        // Deteksi obstacle sangat dekat di depan (khusus ray tengah)
-        bool obstacleVeryCloseFront = false;
-        for (int i = middleRayStart; i <= middleRayEnd; i++) {
-            if (i >= 0 && i < lidarRayCount && lidarHits[i].distance > 0 && lidarHits[i].distance < 0.5f) {
-                obstacleVeryCloseFront = true;
-                break;
-            }
-        }
-
-        // Jika obstacle sangat dekat di depan, reverse
-        if (obstacleVeryCloseFront) {
-            UnityEngine.Debug.Log("Too close to obstacle in front, reversing...");
-            isReversing = true;
-            reverseTimer = 0f;
-            movement.StopMovement();
-            return;
-        }
-
-        // Cek jika robot stuck (terhalang dari banyak arah)
-        bool potentiallyStuck = obstacleLeft && obstacleRight; // Jika kiri dan kanan ada obstacle dekat
-        
-        if (potentiallyStuck)
-        {
-            // Increment stuck timer jika terjebak
-            stuckTimer += Time.deltaTime;
-            
-            // Jika timer melebihi threshold, anggap benar-benar stuck
-            if (stuckTimer >= stuckTimeThreshold && !isStuck)
-            {
-                isStuck = true;
-                UnityEngine.Debug.Log("Robot is STUCK! Initiating escape maneuver");
-                
-                // Catat lokasi ini sebagai area bermasalah
-                problemAreas.Add(transform.position);
-                
-                // Mundur untuk keluar dari situasi stuck
-                isReversing = true;
-                reverseTimer = 0f;
-                movement.StopMovement();
-                return;
-            }
-        }
-        else
-        {
-            // Reset stuck timer jika tidak potensial stuck
-            stuckTimer = 0f;
-            isStuck = false;
-        }
-
-        // Jika ada obstacle sangat dekat di kiri/kanan, JANGAN MAJU/BLOK, tapi JANGAN reverse
-        if (obstacleLeft || obstacleRight) {
-            UnityEngine.Debug.Log("Obstacle detected on the side! Robot adjusts direction");
-            
-            // Jika hanya satu sisi yang terhalang, coba belok ke sisi lain dengan lebih agresif
-            if (obstacleLeft && !obstacleRight) {
-                // Belok kanan karena kiri terhalang, dengan sudut lebih besar
-                movement.TurnRight(steeringAmount * 1.5f);
-                movement.MoveForward();
-                return;
-            }
-            else if (!obstacleLeft && obstacleRight) {
-                // Belok kiri karena kanan terhalang, dengan sudut lebih besar
-                movement.TurnLeft(steeringAmount * 1.5f);
-                movement.MoveForward();
-                return;
-            }
-            else {
-                // Kedua sisi terhalang, BERHENTI TOTAL untuk mencegah tabrakan
-                movement.StopMovement();
-                // Pencegah reverse terlalu cepat:
-                if (stuckTimer < stuckTimeThreshold * 0.5f) {
-                    return; // Keluar sebelum deteksi obstacle di depan
-                }
-            }
-        }
-
-        bool obstacleAhead = false;
         for (int i = middleRayStart; i <= middleRayEnd; i++)
         {
             if (i >= 0 && i < lidarRayCount && lidarHits[i].distance <= minObstacleDistance)
@@ -456,39 +231,32 @@ public class RobotController : MonoBehaviour
 
             movement.StopMovement();
 
-            // Jika kiri dan kanan juga sempit, mundur untuk keluar dari situasi
             if (leftDistance < minObstacleDistance && rightDistance < minObstacleDistance)
             {
-                UnityEngine.Debug.Log("No space to turn or move, initiating reverse to escape!");
-                
-                // Catat lokasi ini sebagai area bermasalah
-                problemAreas.Add(transform.position);
-                
+                UnityEngine.Debug.Log("No space to turn, reversing...");
                 isReversing = true;
                 reverseTimer = 0f;
                 return;
             }
 
-            // Jika salah satu sisi lebih longgar, belok ke arah yang lebih aman dengan lebih agresif
             isTurning = true;
             turnTimer = 0f;
 
             if (leftDistance > rightDistance)
             {
                 UnityEngine.Debug.Log("Turning LEFT");
-                movement.TurnLeft(steeringAmount * 1.2f); // Belok lebih agresif
+                movement.TurnLeft(steeringAmount);
             }
             else
             {
                 UnityEngine.Debug.Log("Turning RIGHT");
-                movement.TurnRight(steeringAmount * 1.2f); // Belok lebih agresif
+                movement.TurnRight(steeringAmount);
             }
 
             movement.MoveForward();
         }
         else
         {
-            // Jalur aman, navigasi ke waypoint seperti biasa
             Vector3 directionToTarget = (targetWaypoint.position - transform.position);
             directionToTarget.y = 0;
 
@@ -575,50 +343,9 @@ public class RobotController : MonoBehaviour
         }
     }
 
-    // Cek apakah posisi saat ini dekat dengan area bermasalah yang sudah diketahui
-    private bool IsNearAnyProblemArea(Vector3 position)
+    private void OnDrawGizmos()
     {
-        foreach (var area in problemAreas)
-        {
-            if (Vector3.Distance(position, area) < minDistanceToProblemArea)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Cek apakah lokasi baru dekat dengan area bermasalah yang sudah ada
-    private bool IsNearExistingProblemArea(Vector3 position)
-    {
-        foreach (var area in problemAreas)
-        {
-            if (Vector3.Distance(position, area) < problemAreaRadius)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Dapatkan arah untuk menghindari area masalah terdekat
-    private Vector3 GetAvoidDirectionFromNearestProblemArea()
-    {
-        Vector3 nearestProblemArea = transform.position;
-        float minDistance = float.MaxValue;
-        
-        foreach (var area in problemAreas)
-        {
-            float distance = Vector3.Distance(transform.position, area);
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                nearestProblemArea = area;
-            }
-        }
-        
-        // Arah berlawanan dari area masalah
-        Vector3 avoidDirection = (transform.position - nearestProblemArea).normalized;
-        return avoidDirection;
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, minObstacleDistance);
     }
 }

@@ -4321,7 +4321,7 @@ Transform:
   m_GameObject: {fileID: 350046763}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 36.150005, y: -3.422, z: -25.400002}
+  m_LocalPosition: {x: 36.62, y: -3.422, z: -24.89}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -15337,7 +15337,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 864c4739c84a02446b646f0f2bbb7679, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  motorForce: 75
+  motorForce: 60
   breakForce: 200
   maxSteerAngle: 35
 --- !u!54 &1033340550
@@ -15382,10 +15382,11 @@ MonoBehaviour:
   candidateLocations:
   - {fileID: 1242313255}
   - {fileID: 1662310228}
-  - {fileID: 901065413}
   - {fileID: 637113351}
+  - {fileID: 901065413}
   pathfinder: {fileID: 353326744}
   speed: 2
+  waypointReachedThreshold: 0.1
 --- !u!114 &1033340554
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15399,17 +15400,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   lidarMaxDistance: 2
-  minObstacleDistance: 2
-  lidarRayCount: 50
-  lidarAngle: 360
+  minObstacleDistance: 1.2
+  lidarRayCount: 30
+  lidarAngle: 160
   obstacleLayer:
     serializedVersion: 2
     m_Bits: 4294967295
-  steeringAmount: 40
+  steeringAmount: 30
   heightDetectionOffset: 0.5
   Waypoint: {fileID: 1242313254}
   arrivalThreshold: 1
-  sideMinObstacleDistance: 0.5
 --- !u!1 &1047154195
 GameObject:
   m_ObjectHideFlags: 0
@@ -15436,7 +15436,7 @@ Transform:
   m_GameObject: {fileID: 1047154195}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 51.359997, y: -3.422, z: 12.45}
+  m_LocalPosition: {x: 56.21, y: -3.422, z: 12.45}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -29454,7 +29454,7 @@ Transform:
   m_GameObject: {fileID: 1930019673}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 30.73, y: -3.422, z: 16.32}
+  m_LocalPosition: {x: 30.73, y: -3.422, z: 17.55}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
