@@ -8,7 +8,7 @@ public class RobotMovement : MonoBehaviour
     private float currentSteerAngle, currentbreakForce;
     private bool isBreaking;
 
-    [SerializeField] private float motorForce, breakForce, maxSteerAngle;
+    [SerializeField] public float motorForce, breakForce, maxSteerAngle;
     public WheelCollider frontLeftWheelCollider, frontRightWheelCollider;
     private WheelCollider rearLeftWheelCollider, rearRightWheelCollider;
     private Transform frontLeftWheelTransform, frontRightWheelTransform;
@@ -69,12 +69,21 @@ public class RobotMovement : MonoBehaviour
         frontRightWheelCollider.steerAngle = currentSteerAngle;
     }
 
-    private void ApplyBreaking()
+    public IEnumerator ApplyBreaking()
     {
-        frontRightWheelCollider.brakeTorque = currentbreakForce;
-        frontLeftWheelCollider.brakeTorque = currentbreakForce;
-        rearLeftWheelCollider.brakeTorque = currentbreakForce;
-        rearRightWheelCollider.brakeTorque = currentbreakForce;
+        // Aktifkan rem
+        frontRightWheelCollider.brakeTorque = breakForce;
+        frontLeftWheelCollider.brakeTorque = breakForce;
+        rearLeftWheelCollider.brakeTorque = breakForce;
+        rearRightWheelCollider.brakeTorque = breakForce;
+
+        yield return new WaitForSeconds(1); // Delay selama 0.2 detik
+
+        // Lepaskan rem
+        frontRightWheelCollider.brakeTorque = 0;
+        frontLeftWheelCollider.brakeTorque = 0;
+        rearLeftWheelCollider.brakeTorque = 0;
+        rearRightWheelCollider.brakeTorque = 0;
     }
 
     private void UpdateWheels()
