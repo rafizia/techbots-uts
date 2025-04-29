@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -33,16 +33,42 @@ public class RobotController : MonoBehaviour
     private Vector3 lastValidPosition; // Posisi terakhir yang valid
     private Quaternion lastValidRotation; // Rotasi terakhir yang valid
 
-    [SerializeField] private Transform Waypoint;
+    public Transform Waypoint;
     [SerializeField] private float arrivalThreshold = 1f; // seberapa dekat ke target dianggap sampai
 
     private bool isMovingToTarget = false;
-    [SerializeField] private List<Transform> waypoints;
-    private int currentWaypointIndex = 0;
 
+    [SerializeField] private float sideMinObstacleDistance = 0.5f; // Jarak minimal aman samping
+    
+    // Variabel untuk mendeteksi dan menangani situasi stuck
+    private bool isStuck = false;
+    private float stuckTimer = 0f;
+    private float stuckTimeThreshold = 1.0f; // Lebih cepat mendeteksi stuck
+    private float stuckRotationAmount = 120f; // Sudut rotasi lebih besar untuk keluar dari situasi stuck
+    private bool isStuckTurning = false;
+    private float stuckTurnTimer = 0f;
+    private float stuckTurnDuration = 1.5f;
+
+    // Obstacle memory untuk menghindari area yang pernah menyebabkan stuck
+    private List<Vector3> problemAreas = new List<Vector3>();
+    private float problemAreaRadius = 2.0f; // Radius area yang dihindari
+    private float minDistanceToProblemArea = 2.5f; // Jarak minimal ke area masalah
+
+    // Force stop flag - untuk mencegah robot bergerak sama sekali jika tabrakan tak terelakkan
+    private bool forceStop = false;
+    private float forceStopTimer = 0f;
+    private float forceStopDuration = 2.0f;
+
+    [SerializeField] private LayerMask bombLayer;
+    private Transform bombTargetTransform;
+    private Transform detectedBombTarget;
+    [SerializeField] private Transform cetiranyabomb;
+    private Boolean toBomb = false;
+    private BombSeekerRobot bombSeekerRobot;
 
     private void Start()
     {
+        bombSeekerRobot = GetComponent<BombSeekerRobot>();
         movement = GetComponent<RobotMovement>();
 
         if (movement == null)
@@ -57,12 +83,61 @@ public class RobotController : MonoBehaviour
         // Set robot to autonomous mode
         movement.SetAutonomousMode(isAutonomousMode);
 
-        // Move forward initially
-        movement.MoveForward();
+        // Stop movement initially and wait for navigation decisions
+        movement.StopMovement();
 
         // Simpan posisi dan rotasi awal sebagai posisi valid
         lastValidPosition = transform.position;
         lastValidRotation = transform.rotation;
+        
+        // Inisialisasi list problem areas
+        problemAreas = new List<Vector3>();
+    }
+
+    void Update()
+    {
+        DetectBombAndNavigate();
+    }
+
+    void DetectBombAndNavigate()
+    {
+        for (int i = 0; i < lidarRayCount; i++)
+        {
+            float startAngle = -lidarAngle / 2;
+            float angleStep = lidarAngle / (lidarRayCount - 1);
+            float currentAngle = startAngle + (angleStep * i);
+
+            float currentMinObstacleDistance = (Mathf.Abs(currentAngle) <= 7.5f) ? 1.5f : 1f;
+
+            Vector3 rayStart = transform.position + Vector3.up * heightDetectionOffset;
+            Vector3 rayDirection = transform.TransformDirection(lidarDirections[i]);
+
+            if (Physics.Raycast(rayStart, rayDirection, out RaycastHit hit, lidarMaxDistance, bombLayer))
+            {
+                lidarHits[i] = hit;
+                Debug.Log("BOMB DETECTED");
+                UnityEngine.Debug.DrawRay(rayStart, rayDirection * hit.distance, Color.red);
+
+                if (detectedBombTarget == null)
+                {
+                    detectedBombTarget = hit.transform;
+                    Debug.Log(detectedBombTarget);
+                    bombSeekerRobot.isBombFound = true;
+                    minObstacleDistance = 1;
+                    Waypoint = detectedBombTarget;
+              
+                    Navigate();
+                }
+            }
+            else
+            {
+                RaycastHit emptyHit = new RaycastHit();
+                emptyHit.distance = float.PositiveInfinity;
+                lidarHits[i] = emptyHit;
+                UnityEngine.Debug.DrawRay(rayStart, rayDirection * lidarMaxDistance, Color.green);
+                detectedBombTarget = null;
+            }
+        }
     }
 
     private void InitializeLidar()
@@ -81,7 +156,7 @@ public class RobotController : MonoBehaviour
         }
     }
 
-    private void Update()
+    public void Navigate()
     {
         // For turning duration tracking
         if (isTurning)
@@ -94,7 +169,29 @@ public class RobotController : MonoBehaviour
             }
         }
 
-        if (isAutonomousMode)
+        // Untuk deteksi stuck turning
+        if (isStuckTurning)
+        {
+            stuckTurnTimer += Time.deltaTime;
+            if (stuckTurnTimer >= stuckTurnDuration)
+            {
+                isStuckTurning = false;
+                stuckTurnTimer = 0f;
+            }
+        }
+
+        // Force stop timer
+        if (forceStop)
+        {
+            forceStopTimer += Time.deltaTime;
+            if (forceStopTimer >= forceStopDuration)
+            {
+                forceStop = false;
+                forceStopTimer = 0f;
+            }
+        }
+
+        if (isAutonomousMode && !forceStop)
         {
             // Scan surroundings with LIDAR
             ScanWithLidar();
@@ -107,7 +204,12 @@ public class RobotController : MonoBehaviour
             // Simpan posisi dan rotasi terakhir yang valid
             lastValidPosition = transform.position;
             lastValidRotation = transform.rotation;
-        }  
+        }
+        else if (forceStop)
+        {
+            // Force robot to completely stop if force stop is active
+            movement.StopMovement();
+        }
     }
 
     private void UpdateVisuals()
@@ -161,13 +263,12 @@ public class RobotController : MonoBehaviour
             {
                 lidarHits[i] = hit;
 
-                Color rayColor = (hit.distance <= currentMinObstacleDistance) ? Color.red : Color.green;
-                UnityEngine.Debug.DrawRay(rayStart, rayDirection * hit.distance, rayColor);
+                UnityEngine.Debug.DrawRay(rayStart, rayDirection * hit.distance, Color.red);
             }
             else
             {
                 RaycastHit emptyHit = new RaycastHit();
-                emptyHit.distance = lidarMaxDistance + 1;
+                emptyHit.distance = float.PositiveInfinity;
                 lidarHits[i] = emptyHit;
                 UnityEngine.Debug.DrawRay(rayStart, rayDirection * lidarMaxDistance, Color.green);
             }
@@ -176,6 +277,13 @@ public class RobotController : MonoBehaviour
 
     private void Navigate(Transform targetWaypoint)
     {
+        // Jika kita dipaksa berhenti, jangan navigasi sama sekali
+        if (forceStop)
+        {
+            movement.StopMovement();
+            return;
+        }
+
         if (isReversing)
         {
             reverseTimer += Time.deltaTime;
@@ -183,38 +291,208 @@ public class RobotController : MonoBehaviour
             {
                 isReversing = false;
                 reverseTimer = 0f;
-                movement.StopMovement();
+                
+                // Setelah mundur, coba belok untuk keluar dari situasi
+                if (isStuck)
+                {
+                    // Catat lokasi ini sebagai area bermasalah
+                    Vector3 problemLocation = transform.position;
+                    if (!IsNearExistingProblemArea(problemLocation))
+                    {
+                        problemAreas.Add(problemLocation);
+                        UnityEngine.Debug.Log($"Added problem area at {problemLocation}. Total: {problemAreas.Count}");
+                    }
+                
+                    UnityEngine.Debug.Log("After reversing, attempting to rotate to escape stuck situation");
+                    isStuckTurning = true;
+                    stuckTurnTimer = 0f;
+
+                    // Belok ke arah yang umumnya lebih luas
+                    float leftDistance = CalculateAverageDistance(0, lidarRayCount / 2 - 1);
+                    float rightDistance = CalculateAverageDistance(lidarRayCount / 2 + 1, lidarRayCount - 1);
+                    
+                    if (leftDistance > rightDistance)
+                    {
+                        movement.TurnLeft(stuckRotationAmount);
+                    }
+                    else
+                    {
+                        movement.TurnRight(stuckRotationAmount);
+                    }
+
+                    // Reset stuck status setelah mencoba keluar
+                    isStuck = false;
+                    stuckTimer = 0f;
+                }
+                else
+                {
+                    movement.StopMovement();
+                }
             }
             else
             {
-                movement.TurnLeft(0);
-                movement.MoveBackward();
+                transform.Rotate(0f, 180f, 0f);
+
+                //movement.TurnLeft(0);
+                //movement.MoveBackward();
             }
             return;
         }
 
-        if (isTurning)
+        if (isTurning || isStuckTurning)
         {
             return;
-        }
-
-        foreach (var hit in lidarHits)
-        {
-            if (hit.distance > 0 && hit.distance < 0.5f)
-            {
-                UnityEngine.Debug.Log("Too close to obstacle, reversing...");
-                isReversing = true;
-                reverseTimer = 0f;
-                return;
-            }
         }
 
         int centerRayIndex = lidarRayCount / 2;
-
-        bool obstacleAhead = false;
         int middleRayStart = centerRayIndex - 1;
         int middleRayEnd = centerRayIndex + 1;
 
+        // Cek jika ada zona masalah di sekitar yang harus dihindari
+        bool nearProblemArea = IsNearAnyProblemArea(transform.position);
+        if (nearProblemArea && false)
+        {
+            // Jika dekat dengan area bermasalah, cari jalan alternatif
+            UnityEngine.Debug.Log("Near a known problem area! Finding alternative path...");
+            
+            // Cari arah yang paling jauh dari area masalah terdekat
+            Vector3 avoidDirection = GetAvoidDirectionFromNearestProblemArea();
+            
+            // Belok ke arah yang berlawanan dengan area masalah
+            float angle = Vector3.SignedAngle(transform.forward, avoidDirection, Vector3.up);
+            
+            if (angle > 0)
+            {
+                movement.TurnRight(Mathf.Min(Mathf.Abs(angle), steeringAmount * 1.5f));
+            }
+            else
+            {
+                movement.TurnLeft(Mathf.Min(Mathf.Abs(angle), steeringAmount * 1.5f));
+            }
+            
+            // Bergerak perlahan saat menghindari area masalah
+            movement.MoveForward();
+            return;
+        }
+
+        // DETEKSI TABRAKAN IMMINENT - Objek sangat dekat dari arah manapun
+        bool aboutToCrash = false;
+        foreach (var hit in lidarHits)
+        {
+            if (hit.distance > 0 && hit.distance < 0.3f) // Threshold lebih kecil untuk deteksi tabrakan imminent
+            {
+                aboutToCrash = true;
+                break;
+            }
+        }
+
+        if (aboutToCrash)
+        {
+            // PAKSA BERHENTI TOTAL JIKA HAMPIR NABRAK
+            UnityEngine.Debug.LogWarning("IMMINENT COLLISION DETECTED! Force stopping all movement!");
+            forceStop = true;
+            forceStopTimer = 0f;
+            movement.StopMovement();
+            return;
+        }
+
+        // Deteksi obstacle di sisi kiri dan kanan
+        bool obstacleLeft = false;
+        bool obstacleRight = false;
+        int sideRayCount = Mathf.Max(2, lidarRayCount / 3); // Lebih banyak ray untuk samping
+        
+        // Cek sisi kiri (ray paling kiri)
+        for (int i = 0; i < sideRayCount; i++) {
+            if (i < lidarHits.Length && lidarHits[i].distance < sideMinObstacleDistance) {
+                obstacleLeft = true;
+                break;
+            }
+        }
+        // Cek sisi kanan (ray paling kanan)
+        for (int i = lidarRayCount - sideRayCount; i < lidarRayCount; i++) {
+            if (i < lidarHits.Length && lidarHits[i].distance < sideMinObstacleDistance) {
+                obstacleRight = true;
+                break;
+            }
+        }
+
+        // Deteksi obstacle sangat dekat di depan (khusus ray tengah)
+        bool obstacleVeryCloseFront = false;
+        for (int i = middleRayStart; i <= middleRayEnd; i++) {
+            if (i >= 0 && i < lidarRayCount && lidarHits[i].distance > 0 && lidarHits[i].distance < 0.5f) {
+                obstacleVeryCloseFront = true;
+                break;
+            }
+        }
+
+        // Jika obstacle sangat dekat di depan, reverse
+        if (obstacleVeryCloseFront) {
+            UnityEngine.Debug.Log("Too close to obstacle in front, reversing...");
+            isReversing = true;
+            reverseTimer = 0f;
+            movement.StopMovement();
+            return;
+        }
+
+        // Cek jika robot stuck (terhalang dari banyak arah)
+        bool potentiallyStuck = obstacleLeft && obstacleRight; // Jika kiri dan kanan ada obstacle dekat
+        
+        if (potentiallyStuck)
+        {
+            // Increment stuck timer jika terjebak
+            stuckTimer += Time.deltaTime;
+            
+            // Jika timer melebihi threshold, anggap benar-benar stuck
+            if (stuckTimer >= stuckTimeThreshold && !isStuck)
+            {
+                isStuck = true;
+                UnityEngine.Debug.Log("Robot is STUCK! Initiating escape maneuver");
+                
+                // Catat lokasi ini sebagai area bermasalah
+                problemAreas.Add(transform.position);
+                
+                // Mundur untuk keluar dari situasi stuck
+                isReversing = true;
+                reverseTimer = 0f;
+                movement.StopMovement();
+                return;
+            }
+        }
+        else
+        {
+            // Reset stuck timer jika tidak potensial stuck
+            stuckTimer = 0f;
+            isStuck = false;
+        }
+
+        // Jika ada obstacle sangat dekat di kiri/kanan, JANGAN MAJU/BLOK, tapi JANGAN reverse
+        if (obstacleLeft || obstacleRight) {
+            UnityEngine.Debug.Log("Obstacle detected on the side! Robot adjusts direction");
+            
+            // Jika hanya satu sisi yang terhalang, coba belok ke sisi lain dengan lebih agresif
+            if (obstacleLeft && !obstacleRight) {
+                // Belok kanan karena kiri terhalang, dengan sudut lebih besar
+                movement.TurnRight(steeringAmount * 1.5f);
+                movement.MoveForward();
+                return;
+            }
+            else if (!obstacleLeft && obstacleRight) {
+                // Belok kiri karena kanan terhalang, dengan sudut lebih besar
+                movement.TurnLeft(steeringAmount * 1.5f);
+                movement.MoveForward();
+                return;
+            }
+            else {
+                // Kedua sisi terhalang, BERHENTI TOTAL untuk mencegah tabrakan
+                movement.StopMovement();
+                // Pencegah reverse terlalu cepat:
+                if (stuckTimer < stuckTimeThreshold * 0.5f) {
+                    return; // Keluar sebelum deteksi obstacle di depan
+                }
+            }
+        }
+
+        bool obstacleAhead = false;
         for (int i = middleRayStart; i <= middleRayEnd; i++)
         {
             if (i >= 0 && i < lidarRayCount && lidarHits[i].distance <= minObstacleDistance)
@@ -234,65 +512,68 @@ public class RobotController : MonoBehaviour
 
             movement.StopMovement();
 
+            // Jika kiri dan kanan juga sempit, mundur untuk keluar dari situasi
             if (leftDistance < minObstacleDistance && rightDistance < minObstacleDistance)
             {
-                UnityEngine.Debug.Log("No space to turn, reversing...");
+                UnityEngine.Debug.Log("No space to turn or move, initiating reverse to escape!");
+                
+                // Catat lokasi ini sebagai area bermasalah
+                problemAreas.Add(transform.position);
+                
                 isReversing = true;
                 reverseTimer = 0f;
                 return;
             }
 
+            // Jika salah satu sisi lebih longgar, belok ke arah yang lebih aman dengan lebih agresif
             isTurning = true;
             turnTimer = 0f;
 
             if (leftDistance > rightDistance)
             {
                 UnityEngine.Debug.Log("Turning LEFT");
-                movement.TurnLeft(steeringAmount);
+                movement.TurnLeft(steeringAmount * 1.2f); // Belok lebih agresif
             }
             else
             {
                 UnityEngine.Debug.Log("Turning RIGHT");
-                movement.TurnRight(steeringAmount);
+                movement.TurnRight(steeringAmount * 1.2f); // Belok lebih agresif
             }
 
             movement.MoveForward();
         }
         else
         {
-            if (waypoints.Count > 0 && currentWaypointIndex < waypoints.Count)
+            // Jalur aman, navigasi ke waypoint seperti biasa
+            Vector3 directionToTarget = (targetWaypoint.position - transform.position);
+            directionToTarget.y = 0;
+
+            float distance = directionToTarget.magnitude;
+            Vector3 dirNormalized = directionToTarget.normalized;
+
+            float angle = Vector3.SignedAngle(transform.forward, dirNormalized, Vector3.up);
+
+            if (Mathf.Abs(angle) > 5f)
             {
-                targetWaypoint = waypoints[currentWaypointIndex];
-
-                // Hitung arah dan jarak ke waypoint
-                Vector3 directionToTarget = (targetWaypoint.position - transform.position);
-                directionToTarget.y = 0;
-
-                float distance = directionToTarget.magnitude;
-                Vector3 dirNormalized = directionToTarget.normalized;
-
-                float angle = Vector3.SignedAngle(transform.forward, dirNormalized, Vector3.up);
-
-                if (Mathf.Abs(angle) > 5f)
-                {
-                    if (angle > 0)
-                        movement.TurnRight(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount));
-                    else
-                        movement.TurnLeft(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount));
-                }
+                if (angle > 0)
+                    movement.TurnRight(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount));
                 else
-                {
-                    movement.TurnLeft(0);
-                }
+                    movement.TurnLeft(Mathf.Clamp(Mathf.Abs(angle), 10f, steeringAmount));
+            }
+            else
+            {
+                movement.TurnLeft(0);
+            }
 
-                movement.MoveForward();
+            movement.MoveForward();
 
-                // Jika sudah dekat dengan waypoint, pindah ke waypoint berikutnya
-                if (distance < 2)
-                {
-                    UnityEngine.Debug.Log($"Reached waypoint {currentWaypointIndex + 1}");
-                    currentWaypointIndex++; // Pindah ke waypoint berikutnya
-                }
+            if (distance < arrivalThreshold)
+            {
+                isMovingToTarget = false;
+                movement.StopMovement();
+                Debug.Log("Robot has reached the target!");
+                bombSeekerRobot.isBombFound = false;
+                minObstacleDistance = 2.5f;
             }
         }
 
@@ -352,9 +633,50 @@ public class RobotController : MonoBehaviour
         }
     }
 
-    private void OnDrawGizmos()
+    // Cek apakah posisi saat ini dekat dengan area bermasalah yang sudah diketahui
+    private bool IsNearAnyProblemArea(Vector3 position)
     {
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, minObstacleDistance);
+        foreach (var area in problemAreas)
+        {
+            if (Vector3.Distance(position, area) < minDistanceToProblemArea)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Cek apakah lokasi baru dekat dengan area bermasalah yang sudah ada
+    private bool IsNearExistingProblemArea(Vector3 position)
+    {
+        foreach (var area in problemAreas)
+        {
+            if (Vector3.Distance(position, area) < problemAreaRadius)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Dapatkan arah untuk menghindari area masalah terdekat
+    private Vector3 GetAvoidDirectionFromNearestProblemArea()
+    {
+        Vector3 nearestProblemArea = transform.position;
+        float minDistance = float.MaxValue;
+        
+        foreach (var area in problemAreas)
+        {
+            float distance = Vector3.Distance(transform.position, area);
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                nearestProblemArea = area;
+            }
+        }
+        
+        // Arah berlawanan dari area masalah
+        Vector3 avoidDirection = (transform.position - nearestProblemArea).normalized;
+        return avoidDirection;
     }
 }

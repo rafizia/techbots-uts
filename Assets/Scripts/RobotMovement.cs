@@ -16,7 +16,7 @@ public class RobotMovement : MonoBehaviour
 
     private bool isAutonomousMode = false;
 
-    private void Start()
+    private void Awake()
     {
         frontLeftWheelCollider = transform.Find("WheelCollider").Find("FrontLeftCollider").GetComponent<WheelCollider>();
         frontRightWheelCollider = transform.Find("WheelCollider").Find("FrontRightCollider").GetComponent<WheelCollider>();
