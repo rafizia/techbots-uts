@@ -15661,8 +15661,8 @@ MonoBehaviour:
   motorForce: 60
   breakForce: 200
   maxSteerAngle: 35
-  frontLeftWheelCollider: {fileID: 0}
-  frontRightWheelCollider: {fileID: 0}
+  frontLeftWheelCollider: {fileID: 1057010753}
+  frontRightWheelCollider: {fileID: 1145528183}
 --- !u!54 &1033340550
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -15709,7 +15709,7 @@ MonoBehaviour:
   - {fileID: 901065413}
   pathfinder: {fileID: 353326744}
   speed: 2
-  waypointReachedThreshold: 0.1
+  waypointReachedThreshold: 0.7
 --- !u!114 &1033340554
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15732,7 +15732,7 @@ MonoBehaviour:
   steeringAmount: 30
   heightDetectionOffset: 0.5
   Waypoint: {fileID: 1242313254}
-  arrivalThreshold: 1
+  arrivalThreshold: 0.7
 --- !u!114 &1033340556
 MonoBehaviour:
   m_ObjectHideFlags: 0

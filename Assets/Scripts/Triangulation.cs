@@ -46,6 +46,6 @@ public class Triangulation : MonoBehaviour
         Debug.DrawLine(transform.position, beacon3.position, Color.blue);
         
         // Debug output
-        Debug.Log($"Calculated Position: ({x}, {y})");
+        // Debug.Log($"Calculated Position: ({x}, {y})");
     }
 }
