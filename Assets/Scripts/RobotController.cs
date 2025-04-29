@@ -38,6 +38,8 @@ public class RobotController : MonoBehaviour
 
     private bool isMovingToTarget = false;
 
+    private bool reverseDirection = false;
+
 
     private void Start()
     {
@@ -185,6 +187,17 @@ public class RobotController : MonoBehaviour
             }
             else
             {
+                var steerAngle = movement.frontLeftWheelCollider.steerAngle;
+                if (steerAngle > 0 && !reverseDirection)
+                {
+                    movement.TurnLeft(Mathf.Abs(steeringAmount));
+                    reverseDirection = true;
+                }
+                else if (steerAngle < 0 && !reverseDirection)
+                {
+                    movement.TurnRight(Mathf.Abs(steeringAmount));
+                    reverseDirection = true;
+                }
                 movement.MoveBackward();
             }
             return;
