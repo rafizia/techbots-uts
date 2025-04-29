@@ -15,6 +15,7 @@ public class BombSeekerRobot : MonoBehaviour
     private bool foundBomb = false;
 
     private RobotController robotController;
+    public bool isBombFound = false;
 
     void Start()
     {
@@ -37,12 +38,14 @@ public class BombSeekerRobot : MonoBehaviour
 
         // Mendapatkan waypoint target berikutnya dari jalur A*
         Transform target = currentPath[pathIndex].transform;
-        
-        // Tetapkan waypoint untuk controller robot
-        robotController.Waypoint = target;
-        
-        // Navigasi menuju waypoint
-        robotController.Navigate();
+
+        if (!isBombFound)
+        {
+            robotController.Waypoint = target;
+            robotController.Navigate();
+        }
+
+        robotController.DetectBombAndNavigate();
 
         // Cek jika mencapai waypoint
         if (Vector3.Distance(transform.position, target.position) < waypointReachedThreshold)

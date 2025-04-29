@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class RobotController : MonoBehaviour
@@ -41,9 +42,19 @@ public class RobotController : MonoBehaviour
 
     private bool reverseDirection = false;
 
+    [SerializeField] private LayerMask bombLayer;
+    private Transform bombTargetTransform;
+    private Transform detectedBombTarget;
+    [SerializeField] private Transform cetiranyabomb;
+    private Boolean toBomb = false;
+    private BombSeekerRobot bombSeekerRobot;
+
+    public Transform currentWaypoint;
+
 
     private void Start()
     {
+        bombSeekerRobot = GetComponent<BombSeekerRobot>();
         movement = GetComponent<RobotMovement>();
 
         if (movement == null)
@@ -64,6 +75,69 @@ public class RobotController : MonoBehaviour
         // Simpan posisi dan rotasi awal sebagai posisi valid
         lastValidPosition = transform.position;
         lastValidRotation = transform.rotation;
+    }
+
+    void Update()
+    {
+        
+    }
+
+    IEnumerator DelayAction()
+    {
+        yield return new WaitForSeconds(0f);
+        // Aksi setelah 0.2 detik
+        Debug.Log("Sudah lewat 0.2 detik");
+        Navigate();
+        if (!bombSeekerRobot.isBombFound)
+        {
+            Waypoint = currentWaypoint;
+            Navigate();
+        }
+    }
+
+    public void DetectBombAndNavigate()
+    {
+        for (int i = 0; i < lidarRayCount; i++)
+        {
+            float startAngle = -lidarAngle / 2;
+            float angleStep = lidarAngle / (lidarRayCount - 1);
+            float currentAngle = startAngle + (angleStep * i);
+
+            float currentMinObstacleDistance = (Mathf.Abs(currentAngle) <= 7.5f) ? 1.5f : 1f;
+
+            Vector3 rayStart = transform.position + Vector3.up * heightDetectionOffset;
+            Vector3 rayDirection = transform.TransformDirection(lidarDirections[i]);
+
+            if (Physics.Raycast(rayStart, rayDirection, out RaycastHit hit, lidarMaxDistance, bombLayer))
+            {
+                lidarHits[i] = hit;
+                Debug.Log("BOMB DETECTED");
+                UnityEngine.Debug.DrawRay(rayStart, rayDirection * hit.distance, Color.red);
+
+                if (detectedBombTarget == null)
+                {
+                    StartCoroutine(DelayAction());
+                    detectedBombTarget = hit.transform;
+                    Debug.Log(detectedBombTarget);
+                    bombSeekerRobot.isBombFound = true;
+                    minObstacleDistance = 1;
+                    currentWaypoint = Waypoint;
+                    Waypoint = detectedBombTarget;
+
+                    
+                    
+
+                }
+            }
+            else
+            {
+                RaycastHit emptyHit = new RaycastHit();
+                emptyHit.distance = float.PositiveInfinity;
+                lidarHits[i] = emptyHit;
+                UnityEngine.Debug.DrawRay(rayStart, rayDirection * lidarMaxDistance, Color.green);
+                detectedBombTarget = null;
+            }
+        }
     }
 
     private void InitializeLidar()
@@ -183,8 +257,33 @@ public class RobotController : MonoBehaviour
 
     private void Navigate(Transform targetWaypoint)
     {
+        Vector3 directionToTarget = (targetWaypoint.position - transform.position);
+        directionToTarget.y = 0;
+
+        float distance = directionToTarget.magnitude;
+
+        if (distance < arrivalThreshold)
+        {
+            isMovingToTarget = false;
+            movement.StopMovement();
+            Debug.Log("Robot has reached the target!");
+            Waypoint = currentWaypoint;
+            StartCoroutine(movement.ApplyBreaking());
+            if (bombSeekerRobot.isBombFound)
+            {
+                Debug.Log("mndur woy");
+                
+                transform.Rotate(0f, 180f, 0f);
+
+
+            }
+            bombSeekerRobot.isBombFound = false;
+            minObstacleDistance = 2.5f;
+        }
+        Debug.Log("lagi navigasi");
         if (isReversing)
         {
+            Debug.Log("lagi reverse");
             reverseTimer += Time.deltaTime;
             if (reverseTimer >= reverseDuration)
             {
@@ -205,6 +304,7 @@ public class RobotController : MonoBehaviour
                     movement.TurnRight(Mathf.Abs(steeringAmount));
                     reverseDirection = true;
                 }
+                movement.TurnLeft(0);
                 movement.MoveBackward();
             }
             return;
@@ -212,6 +312,7 @@ public class RobotController : MonoBehaviour
 
         if (isTurning)
         {
+            Debug.Log("lagi turning");
             return;
         }
 
@@ -219,7 +320,7 @@ public class RobotController : MonoBehaviour
         {
             if (hit.distance > 0 && hit.distance < 0.5f)
             {
-                UnityEngine.Debug.Log("Too close to obstacle, reversing...");
+                Debug.Log("Too close to obstacle, reversing...");
                 isReversing = true;
                 reverseTimer = 0f;
                 return;
@@ -242,8 +343,11 @@ public class RobotController : MonoBehaviour
             }
         }
 
+        
+
         if (obstacleAhead)
         {
+            Debug.Log("OAHYO");
             float leftDistance = CalculateAverageDistance(0, centerRayIndex - 2);
             float rightDistance = CalculateAverageDistance(centerRayIndex + 2, lidarRayCount - 1);
 
@@ -258,7 +362,7 @@ public class RobotController : MonoBehaviour
             if ((leftDistance < minObstacleDistance && rightDistance < minObstacleDistance) || 
                 (leftUnsafe && rightUnsafe))
             {
-                UnityEngine.Debug.Log("No space to turn, reversing...");
+                Debug.Log("No space to turn, reversing...");
                 isReversing = true;
                 reverseTimer = 0f;
                 return;
@@ -293,10 +397,11 @@ public class RobotController : MonoBehaviour
         }
         else
         {
-            Vector3 directionToTarget = (targetWaypoint.position - transform.position);
+            Debug.Log("DSDSDS");
+            directionToTarget = (targetWaypoint.position - transform.position);
             directionToTarget.y = 0;
 
-            float distance = directionToTarget.magnitude;
+            distance = directionToTarget.magnitude;
             Vector3 dirNormalized = directionToTarget.normalized;
 
             float angle = Vector3.SignedAngle(transform.forward, dirNormalized, Vector3.up);
@@ -321,13 +426,6 @@ public class RobotController : MonoBehaviour
             }
 
             movement.MoveForward();
-
-            if (distance < arrivalThreshold)
-            {
-                isMovingToTarget = false;
-                movement.StopMovement();
-                Debug.Log("Robot has reached the target!");
-            }
         }
 
         HandleElevationChanges();
