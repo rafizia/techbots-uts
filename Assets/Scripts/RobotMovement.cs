@@ -9,7 +9,7 @@ public class RobotMovement : MonoBehaviour
     private bool isBreaking;
 
     [SerializeField] private float motorForce, breakForce, maxSteerAngle;
-    private WheelCollider frontLeftWheelCollider, frontRightWheelCollider;
+    public WheelCollider frontLeftWheelCollider, frontRightWheelCollider;
     private WheelCollider rearLeftWheelCollider, rearRightWheelCollider;
     private Transform frontLeftWheelTransform, frontRightWheelTransform;
     private Transform rearLeftWheelTransform, rearRightWheelTransform;
